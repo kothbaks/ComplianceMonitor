@@ -1,4 +1,3 @@
----
 applyTo: "aml-dashboard/src/components/graph/**"
 ---
 
@@ -11,7 +10,8 @@ applyTo: "aml-dashboard/src/components/graph/**"
 - Keep React components functional and use named exports only.
 - Keep graph state transitions explicit: loading, empty, error, success.
 - Keep graph presentation logic separate from AML scoring/business rules.
-- Use Tailwind utility classes only for surrounding UI containers and controls.
+- Use Tailwind utility classes only for React-rendered containers and controls; Cytoscape stylesheet configuration is allowed for graph elements.
+- Document any non-obvious layout or interaction assumptions close to the graph configuration.
 
 ## Never Do
 - Never embed AML detection logic directly in graph components.

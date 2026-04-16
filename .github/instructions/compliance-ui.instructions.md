@@ -1,5 +1,4 @@
----
-applyTo: "aml-dashboard/src/components/compliance/**"
+applyTo: "aml-dashboard/src/components/{compliance,aml}/**"
 ---
 
 # Compliance UI Instructions
@@ -11,6 +10,7 @@ applyTo: "aml-dashboard/src/components/compliance/**"
 - Implement safe UI states for loading, empty, and error.
 - Keep components functional and use named exports only.
 - Use Tailwind utilities only; maintain consistency with project severity colors.
+- Apply the same severity, typology, and badge conventions across both compliance panels and AML summary/chart components.
 - Preserve one-day POC focus: clear investigation flow first, polish second.
 
 ## Never Do
