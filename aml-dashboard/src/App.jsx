@@ -39,13 +39,13 @@ function Dashboard() {
         <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
         <main className="flex-1 flex flex-col overflow-hidden">
           <TabNav />
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-hidden">
             {activeTab === 'graph' && (
-              <div className="h-full flex flex-col">
-                <div className="flex-1 min-h-[400px]">
+              <div className="h-full flex flex-col overflow-hidden">
+                <div className="flex-1 min-h-0">
                   <TransactionGraph />
                 </div>
-                <div className="border-t border-slate-200">
+                <div className="border-t border-slate-200 overflow-auto max-h-64">
                   <TransactionTable />
                 </div>
               </div>

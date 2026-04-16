@@ -42,6 +42,7 @@ export function useData() {
 
         // Only update state if component is still mounted
         if (!cancelled) {
+          console.log('useData: Loaded data - accounts:', accts.length, 'edges:', edgs.length, 'flags:', flgs.length, 'transactions:', txns.length);
           setAccounts(accts);
           setEdges(edgs);
           setFlags(flgs);
