@@ -3,20 +3,32 @@ import cytoscape from 'cytoscape';
 import coseBilkent from 'cytoscape-cose-bilkent';
 import { useApp } from '../../context/AppContext';
 import { RISK_COLORS, FLAGGED_EDGE_COLOR, UNFLAGGED_EDGE_COLOR } from '../../utils/constants';
+import { LoadingSpinner } from '../common/LoadingSpinner';
+import { ErrorBanner } from '../common/ErrorBanner';
+import { EmptyState } from '../common/EmptyState';
 
 cytoscape.use(coseBilkent);
+
+/** Sanitize an identifier so it is safe to use as a Cytoscape element id. */
+function sanitizeId(id) {
+  if (typeof id !== 'string' || id.trim() === '') return null;
+  return id.replace(/[^\w-]/g, '_');
+}
 
 export function TransactionGraph() {
   const containerRef = useRef(null);
   const cyRef = useRef(null);
-  const { accounts, edges, selectedAccountId, setSelectedAccountId } = useApp();
+  const { accounts, edges, loading, error, selectedAccountId, setSelectedAccountId } = useApp();
   const [focusMode, setFocusMode] = useState(true);
 
   useEffect(() => {
-    if (!containerRef.current || accounts.length === 0) return;
+    if (!containerRef.current || loading || error || accounts.length === 0) return;
 
     const involvedAccountIds = new Set();
-    edges.forEach((e) => { involvedAccountIds.add(e.fromAccountId); involvedAccountIds.add(e.toAccountId); });
+    edges.forEach((e) => {
+      if (sanitizeId(e.fromAccountId)) involvedAccountIds.add(e.fromAccountId);
+      if (sanitizeId(e.toAccountId)) involvedAccountIds.add(e.toAccountId);
+    });
 
     const accountMap = new Map(accounts.map((a) => [a.accountId, a]));
 
@@ -39,23 +51,27 @@ export function TransactionGraph() {
       visibleEdges = edges.filter((e) => visibleAccountIds.has(e.fromAccountId) && visibleAccountIds.has(e.toAccountId));
     }
 
-    const nodes = Array.from(visibleAccountIds).map((id) => {
-      const acc = accountMap.get(id);
-      const name = acc ? acc.customerName.split(' ')[0] : id.slice(-4);
-      const risk = acc?.riskRating || 'LOW';
-      return { data: { id, label: name, risk, isSelected: id === selectedAccountId } };
-    });
+    const nodes = Array.from(visibleAccountIds)
+      .filter((id) => sanitizeId(id) !== null)
+      .map((id) => {
+        const acc = accountMap.get(id);
+        const name = acc ? acc.customerName.split(' ')[0] : id.slice(-4);
+        const risk = acc?.riskRating || 'LOW';
+        return { data: { id: sanitizeId(id), label: name, risk, isSelected: id === selectedAccountId } };
+      });
 
-    const cyEdges = visibleEdges.map((e) => ({
-      data: {
-        id: e.edgeId,
-        source: e.fromAccountId,
-        target: e.toAccountId,
-        amount: `${e.currency} ${e.amount.toLocaleString()}`,
-        isFlagged: e.isFlagged,
-        hops: e.hops,
-      },
-    }));
+    const cyEdges = visibleEdges
+      .filter((e) => sanitizeId(e.edgeId) && sanitizeId(e.fromAccountId) && sanitizeId(e.toAccountId))
+      .map((e) => ({
+        data: {
+          id: sanitizeId(e.edgeId),
+          source: sanitizeId(e.fromAccountId),
+          target: sanitizeId(e.toAccountId),
+          amount: `${e.currency} ${e.amount.toLocaleString()}`,
+          isFlagged: e.isFlagged,
+          hops: e.hops,
+        },
+      }));
 
     if (cyRef.current) cyRef.current.destroy();
 
@@ -132,10 +148,49 @@ export function TransactionGraph() {
     });
 
     return () => { if (cyRef.current) cyRef.current.destroy(); };
-  }, [accounts, edges, selectedAccountId, focusMode, setSelectedAccountId]);
+  }, [accounts, edges, loading, error, selectedAccountId, focusMode, setSelectedAccountId]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col h-full" data-testid="graph-loading">
+        <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-slate-200">
+          <h3 className="text-sm font-semibold text-slate-700">Transaction Network</h3>
+        </div>
+        <div className="flex-1 flex items-center justify-center bg-slate-50">
+          <LoadingSpinner />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col h-full" data-testid="graph-error">
+        <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-slate-200">
+          <h3 className="text-sm font-semibold text-slate-700">Transaction Network</h3>
+        </div>
+        <div className="flex-1 bg-slate-50 p-4">
+          <ErrorBanner message={error} />
+        </div>
+      </div>
+    );
+  }
+
+  if (accounts.length === 0) {
+    return (
+      <div className="flex flex-col h-full" data-testid="graph-empty">
+        <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-slate-200">
+          <h3 className="text-sm font-semibold text-slate-700">Transaction Network</h3>
+        </div>
+        <div className="flex-1 bg-slate-50">
+          <EmptyState message="No accounts available to display" />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" data-testid="graph-success">
       <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-slate-200">
         <h3 className="text-sm font-semibold text-slate-700">Transaction Network</h3>
         <label className="flex items-center gap-2 text-xs text-slate-600">
