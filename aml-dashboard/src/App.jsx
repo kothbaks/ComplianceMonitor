@@ -39,9 +39,9 @@ function Dashboard() {
         <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
         <main className="flex-1 flex flex-col overflow-hidden">
           <TabNav />
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden">
             {activeTab === 'graph' && (
-              <div className="h-full flex flex-col overflow-hidden">
+              <div className="flex-1 flex flex-col overflow-hidden">
                 <div className="flex-1 min-h-0">
                   <TransactionGraph />
                 </div>
@@ -52,28 +52,32 @@ function Dashboard() {
             )}
 
             {activeTab === 'aml' && (
-              <div className="space-y-4 p-4">
-                <TypologyLegend />
-                <AccountFlagPanel />
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <PatternTimeSeriesChart />
-                  <SeveritySummaryChart />
-                </div>
-                <TypologyBreakdownChart />
-                {rankedAccount && (
+              <div className="overflow-auto">
+                <div className="space-y-4 p-4">
+                  <TypologyLegend />
+                  <AccountFlagPanel />
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <RiskScoreGauge account={rankedAccount} />
-                    <AccountActionPanel />
+                    <PatternTimeSeriesChart />
+                    <SeveritySummaryChart />
                   </div>
-                )}
+                  <TypologyBreakdownChart />
+                  {rankedAccount && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <RiskScoreGauge account={rankedAccount} />
+                      <AccountActionPanel />
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
             {activeTab === 'queue' && (
-              <div className="space-y-4">
-                <PriorityQueue />
-                <div className="px-4">
-                  <ActivityEvolutionChart />
+              <div className="overflow-auto">
+                <div className="space-y-4">
+                  <PriorityQueue />
+                  <div className="px-4">
+                    <ActivityEvolutionChart />
+                  </div>
                 </div>
               </div>
             )}

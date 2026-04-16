@@ -161,22 +161,16 @@ export function TransactionGraph() {
 
     // Check container dimensions
     const rect = containerRef.current.getBoundingClientRect();
-    console.log('TransactionGraph: Container dimensions:', rect.width, 'x', rect.height);
     
     if (rect.width === 0 || rect.height === 0) {
-      console.warn('TransactionGraph: Container has no dimensions yet, deferring render');
       return;
     }
-
-    console.log('TransactionGraph: Building graph with', accounts.length, 'accounts and', edges.length, 'edges');
 
     const involvedAccountIds = new Set();
     edges.forEach((e) => {
       involvedAccountIds.add(e.fromAccountId);
       involvedAccountIds.add(e.toAccountId);
     });
-
-    console.log('TransactionGraph: involvedAccountIds size:', involvedAccountIds.size);
 
     let visibleEdges = edges;
     let visibleAccountIds = involvedAccountIds;
@@ -191,8 +185,6 @@ export function TransactionGraph() {
     const nodes = buildNodes(visibleAccountIds, accountMap);
     const cyEdges = buildEdges(visibleEdges);
 
-    console.log('TransactionGraph: Built', nodes.length, 'nodes and', cyEdges.length, 'edges');
-
     if (cyRef.current) cyRef.current.destroy();
 
     cyRef.current = cytoscape({
@@ -202,8 +194,6 @@ export function TransactionGraph() {
       // cose-bilkent: force-directed layout tuned for small AML transaction networks
       layout: { name: 'cose-bilkent', animate: false, nodeRepulsion: 8000, idealEdgeLength: 120 },
     });
-
-    console.log('TransactionGraph: Cytoscape instance created');
 
     cyRef.current.on('tap', 'node', (evt) => {
       setSelectedAccountId(evt.target.id());
@@ -267,12 +257,9 @@ export function TransactionGraph() {
     if (cy) cy.zoom({ level: cy.zoom() / 1.2, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } });
   }, []);
 
-  console.log('TransactionGraph render: loading=', loading, 'error=', error, 'accounts=', accounts.length, 'edges=', edges.length);
-
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorBanner message={`Failed to load graph data: ${error}`} />;
   if (accounts.length === 0 || edges.length === 0) {
-    console.log('TransactionGraph: Showing empty state');
     return <EmptyState message="No transaction network data available" />;
   }
 
