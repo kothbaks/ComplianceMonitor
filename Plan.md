@@ -1,188 +1,537 @@
 # Plan: AML Pattern Detection Dashboard
- 
-## Overview
- 
-Build a fully client-side compliance monitoring web application that loads the two Project 2 data sources (`data/accounts.json` and `data/transaction-edges.json`) via `fetch()`, visualises the directed transaction graph, surfaces AML typology flags with severity scoring, and presents a ranked compliance action queue — all with zero backend. The app follows the agentic workflow defined in `AGENTIC_WORKFLOW.md`: produce `BLUEPRINT.md` and `developer_todo.md` first, then implement feature-by-feature using a TDD loop.
- 
-**Tech stack chosen:** React 18 + Vite (fast static dev server, no build complexity), Cytoscape.js (directed-graph network), Chart.js (time-series + bar charts), Tailwind CSS (utility-first styling). All dependencies served from CDN or bundled via Vite — no backend required.
- 
+
+## Project Overview
+
+Build a fully client-side compliance monitoring web application that loads AML data sources (`data/accounts.json`, `data/aml-flags.json`, `data/transactions.json`, `data/transaction-edges.json`) via `fetch()`, visualises the directed transaction graph, surfaces AML typology flags with severity scoring, and presents a ranked compliance action queue — all with zero backend. The app follows the agentic workflow defined in `AGENTIC_WORKFLOW.md`.
+
+**Tech stack:** React 18 + Vite, Cytoscape.js (graph), Chart.js (charts), Tailwind CSS, Vitest (testing).
+
 ---
- 
-## Phase 0 — Agentic Workflow Infrastructure (~20 min)
- 
-*Create the shared documentation artefacts and agent configuration files before touching any feature code.*
- 
-**Steps**
- 
-1. Create `BLUEPRINT.md` in the workspace root documenting: tech stack rationale, data model (exact field names from `accounts.json` / `transaction-edges.json`), component API surface, colour/severity mapping constants, pagination strategy (30 records/page), and the €10,000/24h threshold rule.
- 
-2. Create `developer_todo.md` in the workspace root with phased tasks, acceptance criteria, and TDD requirements for each feature epic (Epics 1–6 below).
- 
-3. Fill `.github/copilot-instructions.md` (currently blank) with universal coding conventions: functional React components, no class components, named exports only, Tailwind for all styles, no inline `style=` attributes, ISO 8601 date formatting, enum values always `UPPER_SNAKE_CASE`.
- 
-4. Create `.github/instructions/aml-domain.instructions.md` (applies to `src/**`) — AML domain rules: severity colour map, typology labels, recommended action labels, structuring threshold constant (9999.99), pagination page size constant (30).
- 
-5. Create `.github/instructions/graph.instructions.md` (applies to `src/components/graph/**`) — Cytoscape.js node/edge styling conventions, layout algorithm (`cose-bilkent`), flagged-edge colour (`#EF4444`), unflagged-edge colour (`#94A3B8`).
- 
-6. Create `.github/agents/data-layer.agent.md` — agent responsible only for `src/services/` and `src/hooks/`; model `Claude Sonnet 4.6`; tools: read, search, run tests.
- 
-7. Create `.github/agents/graph-viz.agent.md` — agent responsible only for `src/components/graph/`; Cytoscape.js expert persona.
- 
-8. Create `.github/agents/compliance-ui.agent.md` — agent responsible only for `src/components/compliance/`; AML domain expert persona.
- 
-9. Create `.github/skills/create-backlog-item/SKILL.md` — prompts agent to take a `developer_todo.md` item and expand it into a full task card with acceptance criteria, affected files, test cases.
- 
-10. Create `.github/skills/run-tests/SKILL.md` — prompts agent to run `npm test`, capture output, and report pass/fail summary.
- 
-11. Create `.github/prompts/feature-tdd.prompt.md` — reusable workflow: write failing tests → confirm fail → implement → confirm green → update `developer_todo.md`.
- 
+
+## Workflow Phases
+
+| Phase | Title | Time | Mode(s) | Checkpoint |
+|---|---|---|---|---|
+| [0](#phase-0--environment--project-foundation-20-min) | Environment & Project Foundation | ~20 min | Agent | Verify environment & enable Chat Debug View |
+| [1](#phase-1--blueprint--research-30-min-hard-stop) | Blueprint & Research | ~30 min *(hard stop)* | Ask | Review `BLUEPRINT.md` & `developer_todo.md` |
+| [2](#phase-2--base--domain-instructions-20-min) | Base & Domain Instructions | ~20 min | Ask → Agent | Validate no contradictions in instructions |
+| [3](#phase-3--specialist-agents-25-min) | Specialist Agents | ~25 min | Ask → Agent | Test agent boundaries & approve designs |
+| [4](#phase-4--skills-15-min) | Skills | ~15 min | Agent | Verify all skills scaffold correctly |
+| [5](#phase-5--feature-implementation-60-90-min) | Feature Implementation | 60–90 min | Plan | End-to-end one backlog item; cross-domain validation |
+| [6](#phase-6--retrospective-15-min) | Retrospective | ~15 min | Ask | Discuss agent drift, timing, improvements |
+| [7](#phase-7--stretch-hooks--orchestration) | Stretch: Hooks & Orchestration | open-ended | Agent | *(Post-workshop)* |
+
 ---
- 
-## Phase 1 — Project Scaffold & Data Layer (Epic 1)
- 
-*Greenfield setup. No implementation code exists yet.*
- 
-**Steps**
- 
-1. Initialise a Vite + React project inside the workspace:
-   `npm create vite@latest aml-dashboard -- --template react` → produces `aml-dashboard/` sibling to `data/`.
- 
-2. Install dependencies: `cytoscape`, `cytoscape-cose-bilkent`, `chart.js`, `react-chartjs-2`, `tailwindcss`, `@tailwindcss/vite`, `date-fns`, `uuid`.
- 
-3. Configure Vite `vite.config.js` to serve the parent-level `data/` folder as a static asset path so `fetch('/data/accounts.json')` resolves correctly during dev.
- 
-4. Create `src/services/dataLoader.js` — exports two async functions: `loadAccounts()` (fetches `accounts.json`, returns array of 50 account objects) and `loadEdges()` (fetches `transaction-edges.json`, returns array of 40 edge objects). Both functions must throw typed errors on fetch failure.
- 
-5. Create `src/services/graphAnalysis.js` — pure functions: `buildAdjacencyMap(edges)`, `detectCycles(adjacencyMap)` (returns round-trip chains), `findHighHopPaths(edges, minHops)` (returns layering candidates), `groupByAccount(edges)` (returns `Map<accountId, Edge[]>`).
- 
-6. Create `src/services/amlDetection.js` — pure functions: `getStructuringEdges(edges)` (amount between 9000–9999), `aggregateByAccount24h(edges)` (sum per account per 24h window), `breachesThreshold(sum)` (returns `true` if > 10000), `rankAccounts(accounts, edges)` (returns sorted priority array by highest severity + highest confidence).
- 
-7. Create `src/hooks/useData.js` — React hook that calls `loadAccounts()` + `loadEdges()` in parallel via `Promise.all`, stores results in state, exposes `{ accounts, edges, loading, error }`.
- 
-8. Create `src/hooks/usePagination.js` — generic hook: takes `items[]` and `pageSize=30`, exposes `{ page, totalPages, currentItems, nextPage, prevPage, goToPage }`.
- 
-9. Create `src/hooks/useFilters.js` — manages filter state: `dateRange`, `typology`, `severity`, `isFlagged`, `currency`; exposes filtered subset of accounts/edges.
- 
-10. Write unit tests for all services in `src/services/__tests__/` using Vitest. TDD order: write tests → confirm fail → implement → green.
- 
+
+## Phase 0 — Environment & Project Foundation (~20 min)
+*Verify your environment and create the infrastructure directories.*
+
+**Checklist**
+
+- [ ] **0.1** Verify IDE and Copilot extensions are installed and functional
+- [ ] **0.2** Confirm agent mode is available and you can switch between custom agents
+- [ ] **0.3** Enable Chat Debug View: open Chat panel, select `...` menu → **Open Chat Debug View**
+- [ ] **0.4** Create infrastructure directories (Agent mode):
+  ```
+  .github/agents/
+  .github/skills/
+  .github/hooks/
+  .github/instructions/
+  .github/prompts/
+  ```
+
+**Checkpoint:** Proceed to Phase 1 only after all four items are confirmed.
+
 ---
- 
-## Phase 2 — Application Shell & Navigation (Epic 2)
- 
-**Steps**
- 
-1. Create `src/App.jsx` — root component. Layout: fixed top `<Header>`, collapsible left `<Sidebar>` (account list), main content area with tab navigation for the three feature panels.
- 
-2. Create `src/components/layout/Header.jsx` — app title "AML Compliance Dashboard", global search input (filters account list by name/IBAN), date shown as "Last updated: April 16, 2026".
- 
-3. Create `src/components/layout/Sidebar.jsx` — scrollable list of all 50 accounts; each row shows avatar initials, customer name, account type badge, risk rating badge, flag count chip. Clicking a row sets the `selectedAccountId` global state.
- 
-4. Create `src/components/layout/TabNav.jsx` — three tabs: "Transaction Graph", "AML Patterns", "Priority Queue". Active tab drives which panel renders in main content.
- 
-5. Create `src/context/AppContext.jsx` — React context holding: `selectedAccountId`, `setSelectedAccountId`, `accounts`, `edges`, `loading`, `error`. Wrap `App.jsx` in `<AppProvider>`.
- 
-6. Define all colour/severity constants in `src/utils/constants.js`:
-   - Severity → Tailwind class map: `LOW → green-400`, `MEDIUM → yellow-400`, `HIGH → orange-500`, `CRITICAL → red-600`
-   - Typology label map: `STRUCTURING → "Structuring"`, etc.
-   - Action badge colour map: `SAR → red`, `EDD → orange`, `FREEZE → blue`, `FIU_ESCALATION → purple`
- 
+
+## Phase 1 — Blueprint & Research (~30 min — hard stop)
+
+*Produce foundational artefacts before writing implementation code.*
+
+**Mode: Ask** (use AI as a sparring partner, not a code generator)
+
+### 1.1 Define the Project with AI (Ask Mode)
+
+Quiz yourself with AI as a guide:
+- Problem solved & who it serves
+- Key features & user interactions
+- Data model & layering (data layer, logic, presentation)
+- Constraints (no external APIs, in-memory, mock endpoints, etc.)
+
+### 1.2 Generate `BLUEPRINT.md` (Ask Mode)
+
+Have AI produce a project specification covering:
+- **Purpose & user scenarios** — who uses it, what they need to see
+- **Feature list** — broken down by functional area
+- **Data model** — entities, fields, relationships (reference exact field names from `accounts.json`, `aml-flags.json`, `transaction-edges.json`, `transactions.json`)
+- **API surface** — React hooks and service functions that expose data
+- **Constraints** — €10,000/24h threshold, 30 records/page pagination, no backend
+- **Colour/severity mapping** — constants for UI rendering
+
+### 1.3 Generate `developer_todo.md` (Ask Mode)
+
+Have AI produce a phased task breakdown. **Every task must:**
+- Be completable in a **single agent context window** (≤5 files touched)
+- Have a clear **acceptance criterion** (testable statement of done)
+- Include a **TDD requirement** (what tests exist before task is done)
+- Be tagged with domain: `data-layer`, `graph`, `compliance-ui`, `testing`, or `polish`
+
+Tasks exceeding 5 files must be split. Review and approve all tasks before Phase 2.
+
+**Checkpoint:** Do not proceed until `BLUEPRINT.md` and `developer_todo.md` exist and are reviewed.
+
 ---
- 
-## Phase 3 — Transaction Chain Display (Epic 3, Feature 1)
- 
-*Covers paginated transaction history, filters, and graph visualisation.*
- 
-**Steps**
- 
-1. Create `src/components/graph/TransactionGraph.jsx` — Cytoscape.js canvas. Nodes = accounts (circle, labelled with `customerName` shortened), edges = transaction amounts (labelled with amount + currency). Flagged edges rendered red dashed; unflagged edges rendered grey. Layout: `cose-bilkent`. On node click → update `selectedAccountId`.
- 
-2. Configure Cytoscape node styles: node colour by `riskRating` (LOW=green, MEDIUM=yellow, HIGH=orange, PEP=purple), border pulse animation on selected node.
- 
-3. Add a "Focus Account" control: when `selectedAccountId` is set, filter graph to show only the ego-network (1–2 hops from that account) with a toggle to expand to full graph.
- 
-4. Create `src/components/transactions/TransactionTable.jsx` — table of edges involving the selected account. Columns: Edge ID, From, To, Amount, Currency, Hops, Timestamp, Flagged. Sorted by timestamp descending. Paginated at 30 rows/page using `usePagination` hook.
- 
-5. Create `src/components/transactions/FilterBar.jsx` — filter controls: date range picker (from/to), typology multi-select chip group, severity multi-select chip group, "Flagged only" toggle, currency dropdown. All filters wired to `useFilters` hook.
- 
-6. Create `src/components/transactions/TransactionDetail.jsx` — side drawer or modal: shows full edge metadata + hop chain for a selected transaction edge. Lists all intermediate accounts in the hop path.
- 
-7. Create `src/components/transactions/HopBadge.jsx` — small badge rendering hop count with tooltip. Hops ≥ 3 renders in amber; hops ≥ 4 renders in red.
- 
+
+## Phase 2 — Base & Domain Instructions (~20 min)
+
+*Encode project standards so every agent follows them without repetition.*
+
+### 2.1 Generate Base Custom Instructions (Ask Mode)
+
+Create `.github/copilot-instructions.md` with:
+- Project purpose (one paragraph)
+- Code style: functional React, named exports, Tailwind only, no inline `style=`, ISO 8601 dates, `UPPER_SNAKE_CASE` enums
+- Error handling expectations
+- Documentation & commit expectations
+
+### 2.2 Identify Your Domains (Ask Mode)
+
+With AI, identify 2–3 domains relevant to your project:
+- **Data layer** — data loading, service functions, graph analysis, AML detection
+- **Graph UI** — Cytoscape.js components, styling, interactions
+- **Compliance UI** — AML patterns, priority queue, action panels
+- **Testing** — Vitest conventions, TDD loop
+
+For each, note a glob pattern (e.g., `src/services/**`, `src/components/graph/**`) and key concerns.
+
+### 2.3 Generate Domain Instruction Files (Agent Mode)
+
+For each domain, create `.github/instructions/<domain>.instructions.md`:
+- Glob pattern in YAML `applyTo` field (auto-activates when matching files open)
+- What to always do (patterns, validations, structure)
+- What to never do (anti-patterns, shortcuts that cause problems)
+- Domain-specific security/performance concerns
+
+Examples:
+- `data-layer.instructions.md` (applies to `src/services/**`, `src/hooks/**`) — fetch error handling, pure functions, typed errors
+- `graph.instructions.md` (applies to `src/components/graph/**`) — Cytoscape.js conventions, `cose-bilkent` layout, flagged-edge colour `#EF4444`
+- `compliance-ui.instructions.md` (applies to `src/components/compliance/**`) — severity colour mapping, action badge constants
+
+### 2.4 Validate for Contradictions (Agent Mode)
+
+Add all instruction files as context. Ask AI: are there contradictions between domain and base instructions, or gaps? Resolve all issues. Keep to **5 minutes**.
+
+**Checkpoint:** All instruction files created and validated before Phase 3.
+
 ---
- 
-## Phase 4 — AML Pattern Visualisation (Epic 4, Feature 2)
- 
-**Steps**
- 
-1. Create `src/components/aml/AmlFlagCard.jsx` — card component for one AML flag. Shows: typology label (icon + text), confidence score as a radial arc (0–100%), severity chip (colour-coded), `detectedAt` formatted as relative time, recommended action badge.
- 
-2. Create `src/components/aml/AccountFlagPanel.jsx` — for the selected account, renders a grid of `<AmlFlagCard>` for each flag in `account.amlFlags`. Shows "No flags detected" empty state if array is empty.
- 
-3. Create `src/components/aml/TypologyLegend.jsx` — static explainer component defining each typology in plain language (shown as a collapsible info panel).
- 
-4. Create `src/components/aml/PatternTimeSeriesChart.jsx` — Chart.js line chart. X-axis: 30 days rolling back from today (April 16, 2026). Y-axis: number of flagged edges active per day (derived from `timestamp` in `transaction-edges.json`). Separate line per typology, colour-coded. Uses `react-chartjs-2`.
- 
-5. Create `src/components/aml/ConfidenceBar.jsx` — horizontal progress bar visualising `confidenceScore` 0–100, coloured by severity level.
- 
-6. Create `src/components/aml/SeveritySummaryChart.jsx` — Chart.js doughnut chart showing distribution of severities across all 34 flags system-wide (CRITICAL=11, HIGH=13, MEDIUM=7, LOW=3).
- 
-7. Create `src/components/aml/TypologyBreakdownChart.jsx` — Chart.js horizontal bar chart showing flag counts per typology (STRUCTURING=11, LAYERING=10, ROUND_TRIPPING=9, SHELL_NETWORK=7).
- 
+
+## Phase 3 — Specialist Agents (~25 min)
+
+*Create focused AI assistants with clear roles and enforced boundaries.*
+
+### 3.1 Design Your Specialists with AI (Ask Mode)
+
+Design each specialist:
+- Single responsibility
+- Required tools (read, search, terminal, problems — only what it needs)
+- Explicit boundaries (what files/domains it must not touch)
+- Output protocols (format, review steps)
+
+### 3.2 Create Specialist Agent Files (Agent Mode)
+
+Create `.github/agents/<name>.agent.md` for each specialist:
+
+**Data Layer Agent** (applies to `src/services/**`, `src/hooks/**`)
+- Responsibility: data loading, service functions, graph analysis, AML detection algorithms
+- Tools: read, write, search, terminal, problems
+- Boundary: never touches `src/components/**`
+- Output: service/hook functions with typed errors, JSDoc comments
+
+**Graph UI Agent** (applies to `src/components/graph/**`)
+- Responsibility: Cytoscape.js graph visualisation, node/edge styling, interactions
+- Tools: read, write, search, problems
+- Boundary: never touches `src/services/**` or other component domains
+- Output: React components following Cytoscape conventions, Tailwind-only styling
+
+**Compliance UI Agent** (applies to `src/components/compliance/**`)
+- Responsibility: AML patterns, priority queue, action panels, alerts, charts
+- Tools: read, write, search, problems
+- Boundary: never touches `src/services/**` or graph components
+- Output: React components connected to data layer, following AML domain conventions
+
+**Test Engineer Agent** (applies to `src/**/__tests__/**`, `src/**/*.test.js`)
+- Responsibility: write failing tests first, confirm failure reason, then implement production code
+- Tools: read, write, terminal, search
+- Boundary: never skips the TDD sequence; always tests before implementation
+- Output: passing test suites with integration coverage
+- Protocol: explicitly state "Tests written and failing for the right reason" before implementation
+
+**Project Manager Agent** (applies to project planning only)
+- Responsibility: assess project state, select backlog items, produce elaborated tasks
+- Tools: read, search (never write production code)
+- Boundary: never implements features; only planning & elaboration
+- Skills: uses `project-metrics` (collect state), `create-backlog-item` (structure tasks)
+- Output: structured backlog items ready for specialist approval
+
+### 3.3 Validate Agent Boundaries (Agent Mode)
+
+Test each specialist:
+- Ask a domain question it should answer — verify correct response
+- Ask a question outside its domain — verify it declines and suggests the correct agent
+- For a cross-domain feature — verify each agent maintains focus on its boundary
+
+**Checkpoint:** All specialist agents created and boundaries validated.
+
 ---
- 
-## Phase 5 — Compliance Decision Support (Epic 5, Feature 3)
- 
-**Steps**
- 
-1. Create `src/components/compliance/PriorityQueue.jsx` — ranked list of accounts requiring action. Rank algorithm (from `rankAccounts()` in `amlDetection.js`): sort by (1) highest severity level, (2) highest `confidenceScore`, (3) most flags. Each row shows rank position, customer name, flag count, top recommended action, risk rating badge, and a "Review" button.
- 
-2. Create `src/components/compliance/AccountActionPanel.jsx` — for the selected account from the priority queue, shows four action buttons: "File SAR", "Request EDD", "Freeze Account", "Escalate to FIU". Buttons are decorative (no backend); clicking shows a confirmation toast "Action logged (mock)".
- 
-3. Create `src/components/compliance/ThresholdBreachAlert.jsx` — scans `transaction-edges.json` edges grouped by `fromAccountId` within any 24h window. Renders a dismissible alert banner for each account whose 24h aggregate exceeds €10,000. Uses `aggregateByAccount24h()` from `amlDetection.js`.
- 
-4. Create `src/components/compliance/ActivityEvolutionChart.jsx` — Chart.js line chart. Plots total volume of flagged transactions per day over the past 30 days for the selected account. Overlays a red dashed horizontal line at €10,000 threshold.
- 
-5. Create `src/components/compliance/ActionBadge.jsx` — pill badge showing recommended action with colour: SAR=red, EDD=orange, FREEZE=blue, FIU_ESCALATION=purple.
- 
-6. Create `src/components/compliance/RiskScoreGauge.jsx` — derived composite risk gauge (0–100) computed from: max severity score (CRITICAL=100, HIGH=75, MEDIUM=50, LOW=25) × (confidenceScore/100) × (1 + 0.1 × flagCount). Display as a semi-circular gauge using Chart.js.
- 
+
+## Phase 4 — Skills (~15 min)
+
+*Replace LLM guesswork with deterministic, reusable capabilities.*
+
+### 4.1 Create `create-backlog-item` Skill (Agent Mode)
+
+Create `.github/skills/create-backlog-item/` with:
+- `SKILL.md` — instructs agents to use the included template for all backlog items
+- `backlog-item-template.md` — canonical structure: title, description, acceptance criteria, TDD plan, file scope (≤5 files), definition of done
+
+Reference this skill explicitly in PM Agent instructions.
+
+### 4.2 Create `run-tests` Skill (Agent Mode)
+
+Create `.github/skills/run-tests/` with:
+- `SKILL.md` — instructions for correct test execution
+- `run-tests.sh` — script that runs `npm test`, captures output, reports: test count, failing test names, exit code, summary
+
+Reusable across all agents needing to verify tests.
+
+### 4.3 Create `project-metrics` Skill (Agent Mode)
+
+Create `.github/skills/project-metrics/` with:
+- `SKILL.md` — instructs PM agent to collect project state
+- `project-metrics.sh` — script that counts: source files by layer, test file count, lint/build status signals
+
+PM uses this before selecting backlog items instead of guessing project state.
+
+### 4.4 Create Workflow Prompt Files (Agent Mode)
+
+Create reusable prompts in `.github/prompts/`:
+
+1. **`load-aml-data.prompt.md`** — workflow for loading & transforming JSON files (accounts, flags, transactions, edges) into in-memory structures
+2. **`build-ui-component.prompt.md`** — workflow for creating a React component connected to data layer with loading/error/empty states
+3. **`tdd-loop.prompt.md`** — workflow for TDD sequence: write failing tests → confirm fail → implement → green tests → refactor
+
+Each prompt has:
+- YAML frontmatter: mode, tools, reference agents
+- Structured body guiding multi-step task
+
+**Checkpoint:** All skills and prompts scaffold correctly and are loaded into agent contexts.
+
 ---
- 
-## Phase 6 — Polish & Cross-Cutting Concerns (Epic 6)
- 
-**Steps**
- 
-1. Implement `src/components/common/LoadingSpinner.jsx` — shown during `fetch()` calls.
- 
-2. Implement `src/components/common/ErrorBanner.jsx` — shown if either data file fails to load.
- 
-3. Implement `src/components/common/EmptyState.jsx` — shown when filters return no results.
- 
-4. Implement `src/components/common/Toast.jsx` + `src/hooks/useToast.js` — transient notification for mock compliance actions.
- 
-5. Add `src/utils/exportCsv.js` — exports the current priority queue or filtered transaction list as a CSV download (no server needed — uses `Blob` + `URL.createObjectURL`).
- 
-6. Make the layout responsive: sidebar collapses to a hamburger on screens < 768px; graph panel shrinks gracefully.
- 
-7. Ensure keyboard accessibility: all filter controls are focusable, graph nodes are navigable via arrow keys (Cytoscape a11y).
- 
-8. Write integration-style component tests in `src/components/__tests__/` using Vitest + React Testing Library for `PriorityQueue`, `AmlFlagCard`, and `TransactionTable`.
- 
+
+## Phase 5 — Feature Implementation (60–90 min)
+
+*Use the full domain system to build one complete backlog item end-to-end. Example: Epic 1 (Data Layer).*
+
+### 5.0 Select a Feature (with PM Agent)
+
+**Mode: Agent**
+
+Use the PM Agent to:
+1. Run `project-metrics` skill — collect current project state
+2. Review `developer_todo.md` — select next logical backlog item
+3. Use `create-backlog-item` skill — produce elaborated task card
+
+Approve the item before proceeding. If it touches >5 files, ask PM to split it.
+
+### 5.1 Data & Logic Layer Implementation
+
+**Mode: Plan** (multi-file, sequenced work)
+
+Use **Data Layer Agent** with `load-aml-data.prompt.md` workflow:
+
+1. Create `src/services/dataLoader.js`:
+   - `loadAccounts()` — fetches `accounts.json`, returns array with error handling
+   - `loadEdges()` — fetches `transaction-edges.json`, returns array with error handling
+   - `loadFlags()` — fetches `aml-flags.json`, returns array with error handling
+   - `loadTransactions()` — fetches `transactions.json`, returns array with error handling
+   - All throw typed errors on fetch failure
+
+2. Create `src/services/graphAnalysis.js`:
+   - `buildAdjacencyMap(edges)` — pure function
+   - `detectCycles(adjacencyMap)` — returns round-trip chains
+   - `findHighHopPaths(edges, minHops)` — returns layering candidates
+   - `groupByAccount(edges)` — returns `Map<accountId, Edge[]>`
+
+3. Create `src/services/amlDetection.js`:
+   - `getStructuringEdges(edges)` — amount between 9000–9999
+   - `aggregateByAccount24h(edges)` — sum per account per 24h window
+   - `breachesThreshold(sum)` — returns `true` if > 10000
+   - `rankAccounts(accounts, edges, flags)` — returns sorted priority array
+
+4. Create `src/hooks/useData.js`:
+   - Calls all loaders in parallel via `Promise.all`
+   - Exposes: `{ accounts, edges, flags, transactions, loading, error }`
+
+5. Create `src/hooks/usePagination.js`:
+   - Takes `items[]` and `pageSize=30`
+   - Exposes: `{ page, totalPages, currentItems, nextPage, prevPage, goToPage }`
+
+6. Create `src/hooks/useFilters.js`:
+   - Manages: `dateRange`, `typology`, `severity`, `isFlagged`, `currency`
+   - Exposes filtered subset of accounts/edges
+
+7. Implement error handling for missing/malformed data
+
+8. Ask specialist to review for standards compliance before moving on
+
+### 5.2 Testing — Strict TDD Loop
+
+**Mode: Plan** (with Test Engineer Agent using `tdd-loop.prompt.md`)
+
+**Sequence (mandatory order):**
+
+1. **Write failing tests first** in `src/services/__tests__/` using Vitest:
+   - Map each acceptance criterion to a test case
+   - Write tests for: dataLoader functions, graphAnalysis functions, amlDetection functions
+   - Run tests using `run-tests` skill — confirm they fail for the right reason
+   - Do NOT implement production code yet
+
+2. **Confirm failure** — ask Test Engineer to verify test names/reasons in output
+
+3. **Implement production code** — production code goes into services (step 1–6 above)
+
+4. **Run tests again** using `run-tests` skill — loop until all pass
+
+5. **Do not declare success** until `run-tests` skill reports all green
+
+### 5.3 Presentation Layer Integration (Optional — depends on feature size)
+
+**Mode: Plan** (with Graph UI or Compliance UI Agent)
+
+If the backlog item includes UI:
+- Create React components connected to data layer from 5.1
+- Handle loading, empty, and error states
+- Test component integration with data flow
+
+### 5.4 Cross-Domain Validation
+
+**Mode: Agent**
+
+Return to general mode. Verify:
+- Does frontend consume data layer correctly?
+- Do tests cover integration points, not just units?
+- Final review for security, performance, standards compliance
+- All acceptance criteria met?
+
+**Checkpoint:** Feature complete and approved before Phase 6.
+
 ---
- 
-## Verification
- 
-- Run `npm test` — all Vitest unit tests green (data layer + services + components).
-- Run `npm run dev` — Vite dev server starts; open `http://localhost:5173`.
-- Load check: network tab shows 200 responses for `accounts.json` (50 records) and `transaction-edges.json` (40 records).
-- Graph renders: 50 nodes visible, 40 directed edges, 22 flagged edges are red dashed.
-- Pagination: selecting an account with > 30 edges shows page controls.
-- Priority queue: `acct-...046` (Svetlana Morozova — 3 CRITICAL flags) appears in rank #1 or #2 position.
-- Threshold breach: accounts in the round-trip EUR clusters (acct-3, acct-5, acct-7 chain) trigger the €10k alert banner.
-- Charts render: 30-day time-series shows activity spikes around April 5–11, 2026 (matching edge timestamps).
-- Filters: toggling "Flagged only" hides all 18 unflagged edges from the transaction table.
-- Export: clicking CSV export downloads a valid file with correct headers.
- 
+
+## Phase 6 — Retrospective (~15 min)
+
+*Look back and improve the workflow.*
+
+**Mode: Ask**
+
+Discuss with AI:
+- Where did agents stay within boundaries — and where did they drift?
+- Which steps took longer than expected?
+- What would you change in instructions/skills for the next feature?
+- Review Chat Debug View: what did you learn from tool invocations and skill execution logs?
+
+Use these prompts:
+- How specific should instructions be vs. allowing model judgment?
+- Where are the right human checkpoints?
+- Which skills are reusable vs. agent-specific?
+- How to redirect incorrect agent output without losing context?
+
 ---
- 
-## File Tree (Target State)
+
+## Phase 7 — Stretch: Hooks & Orchestration
+
+*(Post-workshop, if time allows)*
+
+### 7.1 Smart Gatekeeper Hook (Phase 7 A)
+
+Review `.github/hooks/gatekeeper.json` and `.github/hooks/scripts/gatekeeper.sh`. Adjust safe/danger patterns for your project commands. Test: safe command auto-approves, destructive command prompts. Verify in Chat Debug View.
+
+### 7.2 Post-Edit Quality Hook (Phase 7 B)
+
+Create a `PostToolUse` hook JSON that runs linter/formatter after every file edit. Enforces code quality as a system guarantee.
+
+### 7.3 PM Audit Hook (Phase 7 C)
+
+Add `hooks` field to PM Agent `.agent.md` frontmatter. On `Stop`, append timestamped entry to `.github/pm-audit.log`. Verify hook updates after PM session and appears in Chat Debug View.
+
+### 7.4 Orchestration (Phase 7 D)
+
+Eliminate manual agent switching via three-role orchestration:
+- **Coordinator** — delegates to subagents, sees only summaries
+- **Researcher** — reads files, returns compact summary
+- **Implementer** — receives precise instructions, writes code
+
+Steps:
+- Set `user-invocable: false` on specialist agents
+- Add I/O contracts to each agent's instructions
+- Create Coordinator agent with `tools: [agent]` only
+- Run one feature from `developer_todo.md` end-to-end
+
+---
+
+## Design Checklist
+
+Before considering any phase complete, review:
+
+- [ ] Does each agent stop for human approval at key decision points?
+- [ ] Could any LLM guesswork be replaced with a deterministic tool (script, skill)?
+- [ ] Are agent instructions under ~150 lines and clearly structured?
+- [ ] Is each agent's tool list minimal — only what it actually needs?
+- [ ] Does each agent have a defined input/output contract?
+- [ ] Have you tested each agent with a concrete task and observed its behaviour?
+
+---
+
+## Verification Checklist (Phase 5 Example)
+
+- Run `npm test` — all Vitest tests green (data layer + services)
+- Run `npm run dev` — Vite dev server starts; navigate to `http://localhost:5173`
+- Network tab: 200 responses for all four JSON files with correct record counts
+- Data layer: `useData()` hook loads all data in parallel
+- Accounts loaded: 50 records with all fields present
+- Edges loaded: 40 records with typology and flag fields
+- Flags loaded: 34 records with severity and confidence scores
+- Transactions loaded: records present for all 30 days in April 2026
+- Graph analysis: cycle detection works on test data
+- AML detection: structuring edges (9000–9999) identified correctly
+- Threshold breach: aggregation detects accounts exceeding €10,000 in 24h windows
+- Pagination: `usePagination` hook works with 30-item pages
+- Filters: `useFilters` hook correctly filters by date range, typology, severity, flag status
+
+---
+
+## Appendix: Target Project File Tree
+
+```
+ComplianceMonitor/
+├── .github/
+│   ├── agents/
+│   │   ├── data-layer.agent.md
+│   │   ├── graph-ui.agent.md
+│   │   ├── compliance-ui.agent.md
+│   │   ├── test-engineer.agent.md
+│   │   └── pm.agent.md
+│   ├── instructions/
+│   │   ├── data-layer.instructions.md
+│   │   ├── graph.instructions.md
+│   │   └── compliance-ui.instructions.md
+│   ├── skills/
+│   │   ├── create-backlog-item/
+│   │   │   ├── SKILL.md
+│   │   │   └── backlog-item-template.md
+│   │   ├── run-tests/
+│   │   │   ├── SKILL.md
+│   │   │   └── run-tests.sh
+│   │   └── project-metrics/
+│   │       ├── SKILL.md
+│   │       └── project-metrics.sh
+│   ├── prompts/
+│   │   ├── load-aml-data.prompt.md
+│   │   ├── build-ui-component.prompt.md
+│   │   └── tdd-loop.prompt.md
+│   ├── hooks/
+│   │   ├── gatekeeper.json
+│   │   └── scripts/
+│   │       └── gatekeeper.sh
+│   ├── copilot-instructions.md
+│   └── pm-audit.log (created during Phase 7)
+├── aml-dashboard/
+│   ├── src/
+│   │   ├── services/
+│   │   │   ├── dataLoader.js
+│   │   │   ├── graphAnalysis.js
+│   │   │   ├── amlDetection.js
+│   │   │   └── __tests__/
+│   │   │       ├── dataLoader.test.js
+│   │   │       ├── graphAnalysis.test.js
+│   │   │       └── amlDetection.test.js
+│   │   ├── hooks/
+│   │   │   ├── useData.js
+│   │   │   ├── usePagination.js
+│   │   │   ├── useFilters.js
+│   │   │   ├── useToast.js
+│   │   │   └── __tests__/
+│   │   │       └── hooks.test.js
+│   │   ├── components/
+│   │   │   ├── layout/
+│   │   │   │   ├── Header.jsx
+│   │   │   │   ├── Sidebar.jsx
+│   │   │   │   └── TabNav.jsx
+│   │   │   ├── graph/
+│   │   │   │   ├── TransactionGraph.jsx
+│   │   │   │   ├── HopBadge.jsx
+│   │   │   │   └── __tests__/
+│   │   │   │       └── TransactionGraph.test.js
+│   │   │   ├── transactions/
+│   │   │   │   ├── TransactionTable.jsx
+│   │   │   │   ├── FilterBar.jsx
+│   │   │   │   ├── TransactionDetail.jsx
+│   │   │   │   └── __tests__/
+│   │   │   │       └── TransactionTable.test.js
+│   │   │   ├── aml/
+│   │   │   │   ├── AmlFlagCard.jsx
+│   │   │   │   ├── AccountFlagPanel.jsx
+│   │   │   │   ├── TypologyLegend.jsx
+│   │   │   │   ├── PatternTimeSeriesChart.jsx
+│   │   │   │   ├── ConfidenceBar.jsx
+│   │   │   │   ├── SeveritySummaryChart.jsx
+│   │   │   │   └── TypologyBreakdownChart.jsx
+│   │   │   ├── compliance/
+│   │   │   │   ├── PriorityQueue.jsx
+│   │   │   │   ├── AccountActionPanel.jsx
+│   │   │   │   ├── ThresholdBreachAlert.jsx
+│   │   │   │   ├── ActivityEvolutionChart.jsx
+│   │   │   │   ├── ActionBadge.jsx
+│   │   │   │   ├── RiskScoreGauge.jsx
+│   │   │   │   └── __tests__/
+│   │   │   │       └── PriorityQueue.test.js
+│   │   │   └── common/
+│   │   │       ├── LoadingSpinner.jsx
+│   │   │       ├── ErrorBanner.jsx
+│   │   │       ├── EmptyState.jsx
+│   │   │       └── Toast.jsx
+│   │   ├── context/
+│   │   │   └── AppContext.jsx
+│   │   ├── utils/
+│   │   │   ├── constants.js
+│   │   │   └── exportCsv.js
+│   │   ├── App.jsx
+│   │   ├── main.jsx
+│   │   └── App.css
+│   ├── public/
+│   ├── vite.config.js
+│   ├── vitest.config.js
+│   ├── tailwind.config.js
+│   ├── package.json
+│   └── .gitignore
+├── data/
+│   ├── accounts.json
+│   ├── aml-flags.json
+│   ├── transactions.json
+│   └── transaction-edges.json
+├── BLUEPRINT.md
+├── developer_todo.md
+├── Plan.md (this file)
+├── AGENTIC_WORKFLOW.md
+└── README.md
+```
+
+---
+
+## Notes
+
+- **Phase 1 hard stop:** Must complete in 30 minutes even if incomplete. An incomplete blueprint is better than no time for implementation.
+- **Context windows:** Each task ≤5 files to fit in a single agent context.
+- **Human-in-the-loop:** Every phase has a checkpoint where a human reviews and approves before proceeding.
+- **Mode discipline:** Ask mode for decisions, Plan mode for multi-file sequenced work, Agent mode for direct execution.
+- **Design Checklist:** Review before advancing from any phase.
+- **Chat Debug View:** Open and monitor throughout to understand agent reasoning and tool invocations.
