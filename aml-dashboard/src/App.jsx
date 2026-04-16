@@ -41,11 +41,11 @@ function Dashboard() {
           <TabNav />
           <div className="flex-1 flex flex-col overflow-hidden">
             {activeTab === 'graph' && (
-              <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="flex-[3] min-h-[280px] overflow-hidden">
+              <div className="flex-1 flex flex-col overflow-y-auto">
+                <div className="flex-[2] min-h-[220px] overflow-hidden">
                   <TransactionGraph />
                 </div>
-                <div className="flex-[2] min-h-[180px] border-t border-slate-200 overflow-auto">
+                <div className="flex-[4] min-h-[320px] border-t border-slate-200 overflow-hidden">
                   <TransactionTable />
                 </div>
               </div>
