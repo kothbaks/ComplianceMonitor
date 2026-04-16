@@ -9,7 +9,13 @@ import { EmptyState } from '../common/EmptyState';
 
 cytoscape.use(coseBilkent);
 
-/** Sanitize an identifier so it is safe to use as a Cytoscape element id. */
+/**
+ * Sanitizes an identifier for safe use as a Cytoscape element id.
+ * Cytoscape selectors can break on characters outside word chars and hyphens
+ * (e.g. spaces, dots, colons). Replaces any such character with an underscore.
+ * @param {unknown} id
+ * @returns {string|null} sanitized id, or null if the input is not a non-empty string
+ */
 function sanitizeId(id) {
   if (typeof id !== 'string' || id.trim() === '') return null;
   return id.replace(/[^\w-]/g, '_');

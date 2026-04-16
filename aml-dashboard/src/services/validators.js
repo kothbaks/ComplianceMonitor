@@ -1,3 +1,4 @@
+import { ACCOUNT_TYPES, TYPOLOGIES, SEVERITIES, RISK_RATINGS, RECOMMENDED_ACTIONS } from '../utils/constants';
 import { SchemaError } from './errors';
 
 const REQUIRED_STRING = (field, value) => {
@@ -30,14 +31,8 @@ const VALID_ENUM = (field, value, allowed) => {
   }
 };
 
-const ACCOUNT_TYPES = ['PERSONAL', 'BUSINESS', 'OFFSHORE'];
-const RISK_RATINGS = ['LOW', 'MEDIUM', 'HIGH', 'PEP'];
-const TYPOLOGIES = ['STRUCTURING', 'LAYERING', 'ROUND_TRIPPING', 'SHELL_NETWORK'];
-const SEVERITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
-const RECOMMENDED_ACTIONS = ['SAR', 'EDD', 'FREEZE', 'FIU_ESCALATION'];
-
 /**
- * Validates a single AML flag object.
+ * Validates a single AML flag object (embedded in an account).
  * @param {object} flag
  * @returns {object} flag if valid
  */

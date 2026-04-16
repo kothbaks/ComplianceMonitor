@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { rankAccounts, getThresholdBreaches } from '../../services/amlDetection';
-import { RISK_COLORS, SEVERITY_COLORS, TYPOLOGY_LABELS } from '../../utils/constants';
+import { RISK_COLORS, SEVERITY_COLORS, TYPOLOGY_LABELS, THRESHOLD_AMOUNT } from '../../utils/constants';
 import { ActionBadge } from './ActionBadge';
 import { EmptyState } from '../common/EmptyState';
 
@@ -67,7 +67,7 @@ export function PriorityQueue() {
                     )}
                     {hasThresholdBreach && (
                       <span className="text-[10px] text-red-600 font-medium">
-                        ⚠ Threshold breach (&gt;€10k/24h)
+                        ⚠ Threshold breach (&gt;€{THRESHOLD_AMOUNT.toLocaleString()}/24h)
                       </span>
                     )}
                   </div>

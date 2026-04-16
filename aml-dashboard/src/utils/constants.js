@@ -51,6 +51,8 @@ export const UNFLAGGED_EDGE_COLOR = '#94A3B8';
 export const ACCOUNT_TYPES = ['PERSONAL', 'BUSINESS', 'OFFSHORE'];
 export const TYPOLOGIES = ['STRUCTURING', 'LAYERING', 'ROUND_TRIPPING', 'SHELL_NETWORK'];
 export const SEVERITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+export const RISK_RATINGS = ['LOW', 'MEDIUM', 'HIGH', 'PEP'];
+export const RECOMMENDED_ACTIONS = ['SAR', 'EDD', 'FREEZE', 'FIU_ESCALATION'];
 export const CURRENCIES = ['EUR', 'USD', 'SEK', 'GBP'];
 
 export const TABS = [
