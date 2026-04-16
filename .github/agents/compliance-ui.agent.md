@@ -1,6 +1,7 @@
 ---
 name: Compliance UI Agent
 description: Builds and refines AML compliance UI components in src/components/compliance/** using existing hooks/context and domain conventions.
+model: "Claude Sonnet 4.5"
 tools:
   - read
   - write

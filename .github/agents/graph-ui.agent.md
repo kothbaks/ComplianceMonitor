@@ -1,6 +1,7 @@
 ---
 name: Graph UI Agent
 description: Cytoscape.js graph visualisation specialist for the AML transaction network. Handles node/edge styling, graph interactions, layout tuning, and React components under src/components/graph/. Uses Tailwind-only styling.
+model: "Claude Sonnet 4.5"
 tools:
   - read
   - edit

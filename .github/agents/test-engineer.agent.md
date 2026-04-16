@@ -1,6 +1,7 @@
 ---
 name: Test Engineer Agent
 description: Writes failing tests first, confirms failure reason, then implements production code. Enforces strict TDD sequence across all test files in the project.
+model: "Claude Sonnet 4.5"
 tools:
   - read
   - write
