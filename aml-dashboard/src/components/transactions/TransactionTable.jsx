@@ -9,7 +9,7 @@ import { EmptyState } from '../common/EmptyState';
 import { exportToCsv } from '../../utils/exportCsv';
 
 export function TransactionTable() {
-  const { edges, accounts, selectedAccountId } = useApp();
+  const { edges, accounts, flags, selectedAccountId } = useApp();
   const [selectedEdge, setSelectedEdge] = useState(null);
 
   const accountEdges = useMemo(() => {
@@ -19,7 +19,7 @@ export function TransactionTable() {
     );
   }, [edges, selectedAccountId]);
 
-  const { filters, filteredEdges, ...filterActions } = useFilters(accountEdges);
+  const { filters, filteredEdges, ...filterActions } = useFilters(accounts, accountEdges, flags);
   const sorted = useMemo(
     () => [...filteredEdges].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)),
     [filteredEdges]

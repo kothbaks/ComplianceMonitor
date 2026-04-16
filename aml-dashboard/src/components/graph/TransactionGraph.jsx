@@ -159,9 +159,8 @@ export function TransactionGraph() {
   useEffect(() => {
     if (!containerRef.current || accounts.length === 0) return;
 
-    // Check container dimensions
     const rect = containerRef.current.getBoundingClientRect();
-    
+
     if (rect.width === 0 || rect.height === 0) {
       return;
     }
@@ -187,13 +186,47 @@ export function TransactionGraph() {
 
     if (cyRef.current) cyRef.current.destroy();
 
-    cyRef.current = cytoscape({
-      container: containerRef.current,
-      elements: [...nodes, ...cyEdges],
-      style: GRAPH_STYLE,
-      // cose-bilkent: force-directed layout tuned for small AML transaction networks
-      layout: { name: 'cose-bilkent', animate: false, nodeRepulsion: 8000, idealEdgeLength: 120 },
-    });
+    let resizeObserver;
+
+    try {
+      cyRef.current = cytoscape({
+        container: containerRef.current,
+        elements: [...nodes, ...cyEdges],
+        style: GRAPH_STYLE,
+        minZoom: 0.2,
+        maxZoom: 2.5,
+        // cose-bilkent: force-directed layout tuned for small AML transaction networks
+        layout: { name: 'cose-bilkent', animate: false, nodeRepulsion: 8000, idealEdgeLength: 120 },
+      });
+
+      cyRef.current.resize();
+
+      if (cyRef.current.nodes().length > 0) {
+        cyRef.current.fit(undefined, 30);
+        if (cyRef.current.zoom() < 0.2) {
+          cyRef.current.zoom({
+            level: 0.2,
+            renderedPosition: { x: cyRef.current.width() / 2, y: cyRef.current.height() / 2 },
+          });
+          cyRef.current.center();
+        }
+      }
+
+      if (typeof ResizeObserver !== 'undefined') {
+        resizeObserver = new ResizeObserver(() => {
+          const cy = cyRef.current;
+          if (!cy) return;
+          cy.resize();
+        });
+        resizeObserver.observe(containerRef.current);
+      }
+    } catch (error) {
+      if (cyRef.current) {
+        cyRef.current.destroy();
+        cyRef.current = null;
+      }
+      return;
+    }
 
     cyRef.current.on('tap', 'node', (evt) => {
       setSelectedAccountId(evt.target.id());
@@ -223,6 +256,7 @@ export function TransactionGraph() {
 
     return () => {
       setTooltipData(null);
+      if (resizeObserver) resizeObserver.disconnect();
       if (cyRef.current) {
         cyRef.current.destroy();
         cyRef.current = null;
@@ -264,7 +298,7 @@ export function TransactionGraph() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full w-full">
       <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-slate-200">
         <h3 className="text-sm font-semibold text-slate-700">Transaction Network</h3>
         <label className="flex items-center gap-2 text-xs text-slate-600">
@@ -277,8 +311,8 @@ export function TransactionGraph() {
           Focus on selected (2-hop ego network)
         </label>
       </div>
-      <div className="relative flex-1 min-h-[400px] overflow-hidden">
-        <div ref={containerRef} className="absolute inset-0 bg-slate-50" />
+      <div className="relative flex-1 overflow-hidden">
+        <div ref={containerRef} className="w-full h-full bg-slate-50" />
         {/* Graph toolbar — zoom controls rendered as React siblings to Cytoscape container */}
         <div className="absolute top-2 right-2 z-10 flex flex-col gap-1">
           <button
