@@ -2,7 +2,7 @@
 applyTo: "src/**/{rules,rule,policy,policies,controls,control,compliance,evaluator,evaluation,scoring,risk,detector,detection}/**/*.*"
 ---
 
-# Business logic (compliance evaluation & evidence) instructions
+# Business logic (compliance evaluation &amp; evidence) instructions
 
 ## Intent
 When working in business-logic code, prioritize correctness, determinism, and auditability. The output should be explainable: a user must be able to see *why* a control passed/failed and what evidence supports it.
