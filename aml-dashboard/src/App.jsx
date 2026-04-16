@@ -22,13 +22,13 @@ import { rankAccounts } from './services/amlDetection';
 import './App.css';
 
 function Dashboard() {
-  const { loading, error, activeTab, accounts, flags, selectedAccountId, toasts, removeToast } = useApp();
+  const { loading, error, activeTab, accounts, edges, flags, selectedAccountId, toasts, removeToast } = useApp();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   if (loading) return <LoadingSpinner />;
   if (error) return <ErrorBanner message={error} />;
 
-  const ranked = rankAccounts(accounts, flags);
+  const ranked = rankAccounts(accounts, edges, flags);
   const rankedAccount = ranked.find((a) => a.accountId === selectedAccountId);
 
   return (

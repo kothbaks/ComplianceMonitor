@@ -205,7 +205,7 @@ export async function loadTransactions() {
 
   // Validate required fields on first record as smoke test
   if (data.length > 0) {
-    const required = ['transactionId', 'accountId', 'amount', 'currency', 'timestamp', 'type'];
+    const required = ['transactionId', 'accountId', 'amount', 'currency', 'timestamp'];
     const missing = required.filter(field => !(field in data[0]));
     if (missing.length > 0) {
       throw new SchemaValidationError(

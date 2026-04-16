@@ -6,9 +6,9 @@ import { ActionBadge } from './ActionBadge';
 import { EmptyState } from '../common/EmptyState';
 
 export function PriorityQueue() {
-  const { accounts, flags, setSelectedAccountId, setActiveTab } = useApp();
+  const { accounts, edges, flags, setSelectedAccountId, setActiveTab } = useApp();
 
-  const ranked = useMemo(() => rankAccounts(accounts, flags), [accounts, flags]);
+  const ranked = useMemo(() => rankAccounts(accounts, edges, flags), [accounts, edges, flags]);
 
   if (ranked.length === 0) {
     return <EmptyState message="No accounts requiring action" />;
